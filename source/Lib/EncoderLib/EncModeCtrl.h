@@ -279,7 +279,7 @@ protected:
 #endif
   std::map<int, int*>  *m_bimQPMap;
   bool                  m_fastDeltaQP;
-  static_vector<ComprCUCtx, ( MAX_CU_DEPTH << 2 )> m_ComprCUCtxList;
+  
   InterSearch*          m_pcInterSearch;
 
   bool                  m_doPlt;
@@ -288,6 +288,8 @@ public:
 
   virtual ~EncModeCtrl              () {}
 
+  static_vector<ComprCUCtx, ( MAX_CU_DEPTH << 2 )> m_ComprCUCtxList;
+  
   virtual void create               ( const EncCfg& cfg )                                                                   = 0;
   virtual void destroy              ()                                                                                      = 0;
   virtual void initCTUEncoding      ( const Slice &slice )                                                                  = 0;

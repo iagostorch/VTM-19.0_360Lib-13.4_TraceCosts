@@ -71,6 +71,134 @@ const GeoMotionInfo EncCu::m_geoModeTest[GEO_MAX_NUM_CANDS] = {
 
 EncCu::EncCu() {}
 
+// TODO: Move this to class storchmain
+// Used for debugging purposes. Print the name of the input encoding mode
+void translateEncTestModeType(EncTestModeType t){
+  
+  switch(t){
+    case(ETM_HASH_INTER):
+      printf("ETM_HASH_INTER,");
+      break;
+    case(ETM_MERGE_SKIP):
+      printf("ETM_MERGE_SKIP,");
+      break;
+    case(ETM_INTER_ME):
+      printf("ETM_INTER_ME,");
+      break;
+    case(ETM_AFFINE):
+      printf("ETM_AFFINE,");
+      break;
+    case(ETM_MERGE_GEO):
+      printf("ETM_MERGE_GEO,");
+      break;
+    case(ETM_INTRA):
+      printf("ETM_INTRA,");
+      break;
+    case(ETM_PALETTE):
+      printf("ETM_PALETTE,");
+      break;
+    case(ETM_SPLIT_QT):
+      printf("ETM_SPLIT_QT,");
+      break;
+    case(ETM_SPLIT_BT_H):
+      printf("ETM_SPLIT_BT_H,");
+      break;
+    case(ETM_SPLIT_BT_V):
+      printf("ETM_SPLIT_BT_V,");
+      break;
+    case(ETM_SPLIT_TT_H):
+      printf("ETM_SPLIT_TT_H,");
+      break;
+    case(ETM_SPLIT_TT_V):
+      printf("ETM_SPLIT_TT_V,");
+      break;      
+    
+    case(ETM_POST_DONT_SPLIT):
+      printf("ETM_POST_DONT_SPLIT,");
+      break; 
+    #if REUSE_CU_RESULTS
+    case(ETM_RECO_CACHED):
+      printf("ETM_RECO_CACHED,");
+      break; 
+    #endif
+    case(ETM_TRIGGER_IMV_LIST):
+      printf("ETM_TRIGGER_IMV_LIST,");
+      break; 
+    case(ETM_IBC):
+      printf("ETM_IBC,");
+      break;  
+    case(ETM_IBC_MERGE):
+      printf("ETM_IBC_MERGE,");
+      break;   
+    case(ETM_INVALID):
+      printf("ETM_INVALID,");
+      break;         
+  }
+  
+  return;
+}
+
+// TODO: Move this to class storchmain
+// Used for debugging purposes. Print the name of input partition mode
+void translatePartSplit(PartLevel p){
+  switch(p.split){
+    case(CTU_LEVEL):
+      printf("R,");
+      break;
+    case(CU_QUAD_SPLIT):
+      printf("QT,");
+      break;
+    case(CU_HORZ_SPLIT):
+      printf("BH,");
+      break;
+    case(CU_VERT_SPLIT):
+      printf("BV,");
+      break;
+    case(CU_TRIH_SPLIT):
+      printf("TH,");
+      break;
+    case(CU_TRIV_SPLIT):
+      printf("TV,");
+      break;
+    default:
+      printf("%d,",p.split);
+      break;
+
+  }
+    
+}
+
+// TODO: Move this to class storchmain
+// Used for debugging purposes. Print the name of input partition mode
+void translatePartSplit(PartSplit p){
+  switch(p){
+    case(CTU_LEVEL):
+      printf("R,");
+      break;
+    case(CU_QUAD_SPLIT):
+      printf("QT,");
+      break;
+    case(CU_HORZ_SPLIT):
+      printf("BH,");
+      break;
+    case(CU_VERT_SPLIT):
+      printf("BV,");
+      break;
+    case(CU_TRIH_SPLIT):
+      printf("TH,");
+      break;
+    case(CU_TRIV_SPLIT):
+      printf("TV,");
+      break;
+    default:
+      printf("%d,",p);
+      break;
+
+  }
+    
+}
+
+
 void EncCu::create( EncCfg* encCfg )
 {
   unsigned      uiMaxWidth    = encCfg->getMaxCUWidth();
@@ -509,8 +637,23 @@ bool EncCu::xCheckBestMode( CodingStructure *&tempCS, CodingStructure *&bestCS, 
   return bestCSUpdated;
 }
 
-void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Partitioner& partitioner, double maxCostAllowed )
-{
+void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Partitioner& partitioner, double maxCostAllowed ) {
+
+
+  std::map<EncTestModeType, double> splitCostMap = {
+  { ETM_SPLIT_QT, MAX_DOUBLE },
+  { ETM_SPLIT_BT_H, MAX_DOUBLE },
+  { ETM_SPLIT_BT_V, MAX_DOUBLE },
+  { ETM_SPLIT_TT_H, MAX_DOUBLE },
+  { ETM_SPLIT_TT_V, MAX_DOUBLE },
+  { ETM_POST_DONT_SPLIT, MAX_DOUBLE }
+  };
+  
+  
+  
+
+
+
   CHECK(maxCostAllowed < 0, "Wrong value of maxCostAllowed!");
 
   uint32_t compBegin;
@@ -570,6 +713,42 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
   tempCS->splitRdCostBest = nullptr;
   m_modeCtrl->initCULevel( partitioner, *tempCS );
+  
+  // iagostorch
+  
+  int tracePartitions = 0;
+  
+  if (tracePartitions){    
+    // Print POC, XY position, dimensions
+    printf("xCompressCU,POC=%d,X=%d,Y=%d,W=%d,H=%d,Part,", tempCS->picture->poc, tempCS->area.lx(), tempCS->area.ly(), tempCS->area.lwidth(), tempCS->area.lheight());
+
+    PartitioningStack z = partitioner.getPartStack();
+    
+    // Print the sequence of splits (QT, TH, TV, BH, BV) that led to the current CU
+    for(int i=0; i<z.size(); i++){
+      PartLevel part = z.at(i);
+      translatePartSplit(part);
+    }
+    printf("|||");
+    
+    cout << partitioner.getSplitSeries();
+            
+            
+    // Print the set of EncodingModes that will be tested in sequence
+    //*
+    cout << "|||";
+    std::vector<EncTestMode> zz = m_modeCtrl->m_ComprCUCtxList.back().testModes;
+  
+    for(int i=0; i<zz.size(); i++){
+      EncTestMode aa = zz.at(i);
+      translateEncTestModeType(aa.type);
+    }
+    //*/
+    cout << endl;    
+  }  
+  
+  
+  
 #if GDR_ENABLED
   if (m_pcEncCfg->getGdrEnabled())
   {
@@ -897,6 +1076,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( isModeSplit( currTestMode ) )
     {
+      // iagostorch Aqui ele testa os modos de particionamento
       if (bestCS->cus.size() != 0)
       {
         splitmode = bestCS->cus[0]->splitSeries;
@@ -904,7 +1084,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       assert( partitioner.modeType == tempCS->modeType );
       int signalModeConsVal = tempCS->signalModeCons( getPartSplit( currTestMode ), partitioner, modeTypeParent );
       int numRoundRdo = signalModeConsVal == LDT_MODE_TYPE_SIGNAL ? 2 : 1;
-      bool skipInterPass = false;
+      bool skipInterPass = false;      
       for( int i = 0; i < numRoundRdo; i++ )
       {
         //change cons modes
@@ -937,10 +1117,12 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
           {
             m_pcIntraSearch->setNumCuInSCIPU( 0 );
           }
-        }
-
+        }        
         xCheckModeSplit( tempCS, bestCS, partitioner, currTestMode, modeTypeParent, skipInterPass, splitRdCostBest );
         tempCS->splitRdCostBest = splitRdCostBest;
+        
+        splitCostMap[currTestMode.type] = tempCS->cost;
+               
         //recover cons modes
         tempCS->modeType = partitioner.modeType = modeTypeParent;
         tempCS->treeType = partitioner.treeType = treeTypeParent;
@@ -981,6 +1163,22 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
+  
+  tracePartitions = 1 ;
+  
+  if (tracePartitions){    
+    printf("xCompressCU,POC=%d,X=%d,Y=%d,W=%d,H=%d\n", tempCS->picture->poc, tempCS->area.lx(), tempCS->area.ly(), tempCS->area.lwidth(), tempCS->area.lheight());
+    for(int split=CTU_LEVEL; split<=CU_TRIV_SPLIT; split++){
+      printf("  ");
+      translatePartSplit( (PartSplit) split);
+      if(tempCS->splitRdCostBest[split] == MAX_DOUBLE)
+        printf("MAX_DOUBLE\n");
+      else
+        printf("%f\n", tempCS->splitRdCostBest[split]);
+    }
+    
+  }
+  
 
   //////////////////////////////////////////////////////////////////////////
   // Finishing CU
